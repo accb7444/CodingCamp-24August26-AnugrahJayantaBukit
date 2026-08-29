@@ -1,0 +1,113 @@
+<!DOCTYPE html>
+<html lang="en" data-theme="dark">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Developer Workspace Dashboard</title>
+    <link rel="stylesheet" href="css/style.css">
+</head>
+<body>
+    <!-- Header Section -->
+    <header class="header">
+        <div class="container">
+            <h1 class="logo">Developer Dashboard</h1>
+            <button class="theme-toggle" id="themeToggle" aria-label="Toggle theme">
+                <span class="theme-icon">🌙</span>
+            </button>
+        </div>
+    </header>
+
+    <!-- Main Content -->
+    <main class="main-content">
+        <div class="container">
+            <!-- Greeting Section -->
+            <section class="greeting-section">
+                <h2 class="greeting" id="greeting">Good Evening</h2>
+                <div class="time-display">
+                    <p class="current-time" id="currentTime">00:00:00</p>
+                    <p class="current-date" id="currentDate">Loading...</p>
+                </div>
+            </section>
+
+            <!-- Dashboard Grid -->
+            <div class="dashboard-grid">
+                <!-- Focus Timer Widget -->
+                <section class="widget timer-widget">
+                    <h3 class="widget-title">Focus Timer (Pomodoro)</h3>
+                    <div class="timer-display" id="timerDisplay">25:00</div>
+                    <div class="timer-controls">
+                        <button class="btn btn-primary" id="startTimer">Start</button>
+                        <button class="btn btn-secondary" id="pauseTimer">Pause</button>
+                        <button class="btn btn-secondary" id="resetTimer">Reset</button>
+                    </div>
+                </section>
+
+                <!-- To-Do List Widget -->
+                <section class="widget todo-widget">
+                    <div class="widget-header">
+                        <h3 class="widget-title">To-Do List</h3>
+                        <select class="sort-select" id="sortTasks">
+                            <option value="all">All Tasks</option>
+                            <option value="active">Active First</option>
+                            <option value="completed">Completed First</option>
+                            <option value="alphabetical">A-Z</option>
+                        </select>
+                    </div>
+                    
+                    <!-- API Key Configuration -->
+                    <div class="api-config">
+                        <input 
+                            type="password" 
+                            class="api-key-input" 
+                            id="apiKeyInput" 
+                            placeholder="Enter Google Gemini API Key (optional for AI features)"
+                        >
+                        <button class="btn-small" id="saveApiKey">Save Key</button>
+                    </div>
+                    
+                    <div class="todo-input-container">
+                        <input 
+                            type="text" 
+                            class="todo-input" 
+                            id="todoInput" 
+                            placeholder="Add a new task..."
+                        >
+                        <button class="btn btn-add" id="addTask">Add</button>
+                    </div>
+                    
+                    <div class="warning-message" id="warningMessage"></div>
+                    
+                    <ul class="todo-list" id="todoList">
+                        <!-- Tasks will be dynamically inserted here -->
+                    </ul>
+                </section>
+
+                <!-- Quick Links Widget -->
+                <section class="widget links-widget">
+                    <h3 class="widget-title">Quick Links</h3>
+                    <div class="links-input-container">
+                        <input 
+                            type="text" 
+                            class="link-input" 
+                            id="linkTitle" 
+                            placeholder="Link title..."
+                        >
+                        <input 
+                            type="url" 
+                            class="link-input" 
+                            id="linkUrl" 
+                            placeholder="https://example.com"
+                        >
+                        <button class="btn btn-add" id="addLink">Add</button>
+                    </div>
+                    <div class="links-grid" id="linksGrid">
+                        <!-- Links will be dynamically inserted here -->
+                    </div>
+                </section>
+            </div>
+        </div>
+    </main>
+
+    <script src="js/app.js"></script>
+</body>
+</html>
