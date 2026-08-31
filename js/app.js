@@ -8,18 +8,88 @@
 // ===========================
 
 /**
- * IMPORTANT: Insert your Google Gemini API Key here
- * Get your API key from: https://makersuite.google.com/app/apikey
- * The key will be stored securely in LocalStorage after first configuration
+ * AI Provider Configuration
+ * Supports: Google Gemini, OpenRouter, and Custom OpenAI-compatible endpoints
  */
-const GEMINI_API_ENDPOINT = 'https://generativelanguage.googleapis.com/v1beta/models/gemini-pro:generateContent';
+const API_PROVIDERS = {
+    gemini: {
+        name: 'Google Gemini',
+        defaultModel: 'gemini-pro',
+        getEndpoint: (model) => `https://generativelanguage.googleapis.com/v1beta/models/${model}:generateContent`,
+        buildRequest: (prompt, apiKey) => ({
+            url: API_PROVIDERS.gemini.getEndpoint(getModelName()),
+            options: {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({
+                    contents: [{ parts: [{ text: prompt }] }],
+                    generationConfig: { temperature: 0.7, maxOutputTokens: 200 }
+                })
+            },
+            params: `?key=${apiKey}`
+        }),
+        parseResponse: (data) => data.candidates[0].content.parts[0].text
+    },
+    openrouter: {
+        name: 'OpenRouter',
+        defaultModel: 'google/gemini-2.0-flash-001',
+        getEndpoint: () => 'https://openrouter.ai/api/v1/chat/completions',
+        buildRequest: (prompt, apiKey) => ({
+            url: API_PROVIDERS.openrouter.getEndpoint(),
+            options: {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json',
+                    'Authorization': `Bearer ${apiKey}`,
+                    'HTTP-Referer': window.location.href,
+                    'X-Title': 'Developer Dashboard'
+                },
+                body: JSON.stringify({
+                    model: getModelName(),
+                    messages: [{ role: 'user', content: prompt }],
+                    temperature: 0.7,
+                    max_tokens: 200
+                })
+            },
+            params: ''
+        }),
+        parseResponse: (data) => data.choices[0].message.content
+    },
+    custom: {
+        name: 'Custom (OpenAI-compatible)',
+        defaultModel: '',
+        getEndpoint: () => getCustomEndpoint(),
+        buildRequest: (prompt, apiKey) => ({
+            url: getCustomEndpoint(),
+            options: {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json',
+                    'Authorization': `Bearer ${apiKey}`
+                },
+                body: JSON.stringify({
+                    model: getModelName(),
+                    messages: [{ role: 'user', content: prompt }],
+                    temperature: 0.7,
+                    max_tokens: 200
+                })
+            },
+            params: ''
+        }),
+        parseResponse: (data) => data.choices[0].message.content
+    }
+};
 
 // LocalStorage Keys
 const STORAGE_KEYS = {
     TASKS: 'dashboard_tasks',
     LINKS: 'dashboard_links',
     THEME: 'dashboard_theme',
-    API_KEY: 'dashboard_api_key'
+    API_KEY: 'dashboard_api_key',
+    API_PROVIDER: 'dashboard_api_provider',
+    MODEL_NAME: 'dashboard_model_name',
+    CUSTOM_ENDPOINT: 'dashboard_custom_endpoint',
+    TIMER_DURATION: 'dashboard_timer_duration'
 };
 
 // ===========================
@@ -30,8 +100,10 @@ let tasks = [];
 let links = [];
 let currentTheme = 'dark';
 let timerInterval = null;
+let defaultTimerMinutes = 25;
 let timerSeconds = 25 * 60; // 25 minutes in seconds
 let isTimerRunning = false;
+let currentProvider = 'gemini';
 
 // ===========================
 // DOM ELEMENTS
@@ -52,6 +124,9 @@ const elements = {
     startTimer: document.getElementById('startTimer'),
     pauseTimer: document.getElementById('pauseTimer'),
     resetTimer: document.getElementById('resetTimer'),
+    customMinutes: document.getElementById('customMinutes'),
+    setCustomTime: document.getElementById('setCustomTime'),
+    presetBtns: document.querySelectorAll('.preset-btn[data-minutes]'),
     
     // To-Do List
     todoInput: document.getElementById('todoInput'),
@@ -63,6 +138,11 @@ const elements = {
     // API Configuration
     apiKeyInput: document.getElementById('apiKeyInput'),
     saveApiKey: document.getElementById('saveApiKey'),
+    apiProvider: document.getElementById('apiProvider'),
+    modelNameInput: document.getElementById('modelNameInput'),
+    customEndpointInput: document.getElementById('customEndpointInput'),
+    customEndpointRow: document.getElementById('customEndpointRow'),
+    modelNameRow: document.getElementById('modelNameRow'),
     
     // Quick Links
     linkTitle: document.getElementById('linkTitle'),
@@ -110,6 +190,39 @@ function loadFromLocalStorage() {
         elements.apiKeyInput.value = '••••••••••••••••';
         elements.apiKeyInput.dataset.hasKey = 'true';
     }
+    
+    // Load API provider
+    const savedProvider = localStorage.getItem(STORAGE_KEYS.API_PROVIDER);
+    if (savedProvider) {
+        currentProvider = savedProvider;
+        elements.apiProvider.value = savedProvider;
+    }
+    
+    // Load model name
+    const savedModel = localStorage.getItem(STORAGE_KEYS.MODEL_NAME);
+    if (savedModel) {
+        elements.modelNameInput.value = savedModel;
+    } else {
+        elements.modelNameInput.value = API_PROVIDERS[currentProvider].defaultModel;
+    }
+    
+    // Load custom endpoint
+    const savedEndpoint = localStorage.getItem(STORAGE_KEYS.CUSTOM_ENDPOINT);
+    if (savedEndpoint) {
+        elements.customEndpointInput.value = savedEndpoint;
+    }
+    
+    // Load timer duration
+    const savedDuration = localStorage.getItem(STORAGE_KEYS.TIMER_DURATION);
+    if (savedDuration) {
+        defaultTimerMinutes = parseInt(savedDuration, 10);
+        timerSeconds = defaultTimerMinutes * 60;
+        updateTimerDisplay();
+        updatePresetButtons(defaultTimerMinutes);
+    }
+    
+    // Update provider UI
+    updateProviderUI();
 }
 
 function saveToLocalStorage(key, data) {
@@ -120,14 +233,55 @@ function getApiKey() {
     return localStorage.getItem(STORAGE_KEYS.API_KEY) || '';
 }
 
-function saveApiKey() {
+function getModelName() {
+    return localStorage.getItem(STORAGE_KEYS.MODEL_NAME) || API_PROVIDERS[currentProvider].defaultModel;
+}
+
+function getCustomEndpoint() {
+    return localStorage.getItem(STORAGE_KEYS.CUSTOM_ENDPOINT) || '';
+}
+
+function updateProviderUI() {
+    const isCustom = currentProvider === 'custom';
+    elements.customEndpointRow.style.display = isCustom ? 'flex' : 'none';
+    
+    // Update placeholder based on provider
+    const placeholders = {
+        gemini: 'Model name (e.g. gemini-pro, gemini-1.5-flash)',
+        openrouter: 'Model name (e.g. google/gemini-2.0-flash-001, openai/gpt-4o)',
+        custom: 'Model name (e.g. gpt-4o, llama-3.1-70b)'
+    };
+    elements.modelNameInput.placeholder = placeholders[currentProvider] || '';
+}
+
+function saveApiConfig() {
+    // Save API key
     const apiKey = elements.apiKeyInput.value.trim();
     if (apiKey && !apiKey.includes('•')) {
         localStorage.setItem(STORAGE_KEYS.API_KEY, apiKey);
         elements.apiKeyInput.value = '••••••••••••••••';
         elements.apiKeyInput.dataset.hasKey = 'true';
-        showWarning('API Key saved successfully!', 'success');
     }
+    
+    // Save provider
+    currentProvider = elements.apiProvider.value;
+    localStorage.setItem(STORAGE_KEYS.API_PROVIDER, currentProvider);
+    
+    // Save model name
+    const modelName = elements.modelNameInput.value.trim();
+    if (modelName) {
+        localStorage.setItem(STORAGE_KEYS.MODEL_NAME, modelName);
+    }
+    
+    // Save custom endpoint
+    if (currentProvider === 'custom') {
+        const endpoint = elements.customEndpointInput.value.trim();
+        if (endpoint) {
+            localStorage.setItem(STORAGE_KEYS.CUSTOM_ENDPOINT, endpoint);
+        }
+    }
+    
+    showWarning('AI configuration saved successfully!', 'success');
 }
 
 // ===========================
@@ -221,8 +375,23 @@ function pauseTimer() {
 
 function resetTimer() {
     pauseTimer();
-    timerSeconds = 25 * 60;
+    timerSeconds = defaultTimerMinutes * 60;
     updateTimerDisplay();
+}
+
+function setTimerDuration(minutes) {
+    pauseTimer();
+    defaultTimerMinutes = minutes;
+    timerSeconds = minutes * 60;
+    localStorage.setItem(STORAGE_KEYS.TIMER_DURATION, minutes.toString());
+    updateTimerDisplay();
+    updatePresetButtons(minutes);
+}
+
+function updatePresetButtons(minutes) {
+    elements.presetBtns.forEach(btn => {
+        btn.classList.toggle('active', parseInt(btn.dataset.minutes, 10) === minutes);
+    });
 }
 
 // ===========================
@@ -243,11 +412,14 @@ function showWarning(message, type = 'warning') {
     elements.warningMessage.textContent = message;
     elements.warningMessage.classList.add('show');
     elements.warningMessage.style.backgroundColor = 
-        type === 'success' ? 'var(--success-color)' : 'var(--warning-color)';
+        type === 'success' ? 'var(--success-color)' : 
+        type === 'error' ? 'var(--danger-color)' : 'var(--warning-color)';
     
+    // Longer display for errors so users can read the details
+    const duration = type === 'error' ? 8000 : 3000;
     setTimeout(() => {
         elements.warningMessage.classList.remove('show');
-    }, 3000);
+    }, duration);
 }
 
 function addTask() {
@@ -327,6 +499,112 @@ function sortTasksArray(sortType) {
 }
 
 // ===========================
+// API ERROR HANDLING
+// ===========================
+
+/**
+ * Parses API error responses and returns a user-friendly message.
+ * Handles OpenRouter-specific errors (rate limits, provider failures, etc.),
+ * Gemini errors, and generic HTTP errors.
+ */
+function parseApiError(status, errorBody) {
+    let errorData;
+    try {
+        errorData = JSON.parse(errorBody);
+    } catch {
+        // Not JSON, return generic message
+        return `API Error (${status}): ${errorBody.substring(0, 100)}`;
+    }
+
+    const error = errorData.error || errorData;
+    const code = error.code || status;
+    const message = error.message || '';
+    const metadata = error.metadata || {};
+    const providerErrorCode = metadata.provider_error_code || '';
+    const remedyHint = metadata.remedy_hint || '';
+    const retryAfter = metadata.retry_after_seconds || '';
+    const raw = metadata.raw || '';
+
+    // OpenRouter-specific error handling
+    if (currentProvider === 'openrouter') {
+        // Rate limiting (429)
+        if (code === 429 || status === 429) {
+            if (providerErrorCode === 'upstream_429') {
+                let msg = `⏳ Rate limited by the upstream provider. `;
+                if (retryAfter) {
+                    msg += `Retry in ${retryAfter}s. `;
+                }
+                msg += remedyHint ? remedyHint.replace(/https?:\/\/\S+/g, '').trim() : 'Try again shortly or switch to a different model.';
+                return msg;
+            }
+            let msg = `⏳ Rate limited. `;
+            if (retryAfter) msg += `Retry in ${retryAfter}s. `;
+            msg += 'Wait a moment and try again.';
+            return msg;
+        }
+
+        // Authentication error (401)
+        if (code === 401 || status === 401) {
+            return '🔑 Invalid API key. Please check your OpenRouter API key and save again.';
+        }
+
+        // Insufficient credits (402)
+        if (code === 402 || status === 402) {
+            return '💳 Insufficient credits on your OpenRouter account. Add credits at openrouter.ai/credits.';
+        }
+
+        // Content moderation / forbidden (403)
+        if (code === 403 || status === 403) {
+            return '🚫 Request blocked by content moderation. Try rephrasing the task.';
+        }
+
+        // Model not found (404)
+        if (code === 404 || status === 404) {
+            const modelName = getModelName();
+            return `❌ Model "${modelName}" not found on OpenRouter. Check the model name and try again.`;
+        }
+
+        // Request timeout (408/504)
+        if (code === 408 || code === 504 || status === 408 || status === 504) {
+            return '⌛ Request timed out. The model took too long to respond. Try a faster model or try again.';
+        }
+
+        // Provider error (502/503)
+        if (code === 502 || code === 503 || status === 502 || status === 503) {
+            const providerName = metadata.provider_name || 'The provider';
+            return `⚠️ ${providerName} is temporarily unavailable. Try again shortly or switch to a different model.`;
+        }
+
+        // Generic OpenRouter error with remedy hint
+        if (remedyHint) {
+            return `⚠️ ${message}. Hint: ${remedyHint.replace(/https?:\/\/\S+/g, '').trim()}`;
+        }
+    }
+
+    // Gemini-specific errors
+    if (currentProvider === 'gemini') {
+        if (status === 400) {
+            if (message.toLowerCase().includes('api key')) {
+                return '🔑 Invalid Gemini API key. Please check your key and save again.';
+            }
+            return `⚠️ Bad request: ${message.substring(0, 100)}`;
+        }
+        if (status === 403) {
+            return '🔑 Gemini API key is invalid or does not have access. Check your key at makersuite.google.com.';
+        }
+        if (status === 429) {
+            return '⏳ Gemini rate limit hit. Wait a moment and try again.';
+        }
+    }
+
+    // Generic fallback
+    if (message) {
+        return `⚠️ Error ${status}: ${message.substring(0, 120)}`;
+    }
+    return `⚠️ API Error (${status}). Check the browser console for details.`;
+}
+
+// ===========================
 // AI TASK BREAKDOWN FUNCTIONS
 // ===========================
 
@@ -334,7 +612,19 @@ async function generateSubtasks(taskId, taskText) {
     const apiKey = getApiKey();
     
     if (!apiKey) {
-        showWarning('Please configure your Gemini API key first!');
+        showWarning('Please configure your API key first!');
+        return;
+    }
+    
+    const provider = API_PROVIDERS[currentProvider];
+    if (!provider) {
+        showWarning('Invalid API provider selected!');
+        return;
+    }
+    
+    // Validate custom endpoint
+    if (currentProvider === 'custom' && !getCustomEndpoint()) {
+        showWarning('Please enter a custom API endpoint URL!');
         return;
     }
     
@@ -345,30 +635,20 @@ async function generateSubtasks(taskId, taskText) {
     try {
         const prompt = `Break down this task into exactly 3 short, actionable sub-tasks. Task: "${taskText}". Return ONLY a JSON array of 3 strings, nothing else. Format: ["subtask 1", "subtask 2", "subtask 3"]`;
         
-        const response = await fetch(`${GEMINI_API_ENDPOINT}?key=${apiKey}`, {
-            method: 'POST',
-            headers: {
-                'Content-Type': 'application/json'
-            },
-            body: JSON.stringify({
-                contents: [{
-                    parts: [{
-                        text: prompt
-                    }]
-                }],
-                generationConfig: {
-                    temperature: 0.7,
-                    maxOutputTokens: 200
-                }
-            })
-        });
+        const request = provider.buildRequest(prompt, apiKey);
+        
+        const response = await fetch(`${request.url}${request.params}`, request.options);
         
         if (!response.ok) {
-            throw new Error(`API Error: ${response.status} ${response.statusText}`);
+            const errorBody = await response.text();
+            console.error('API Response Error:', errorBody);
+            const friendlyMessage = parseApiError(response.status, errorBody);
+            showWarning(friendlyMessage, 'error');
+            return;
         }
         
         const data = await response.json();
-        const generatedText = data.candidates[0].content.parts[0].text;
+        const generatedText = provider.parseResponse(data);
         
         // Parse the JSON response
         let subtasks;
@@ -405,7 +685,12 @@ async function generateSubtasks(taskId, taskText) {
         
     } catch (error) {
         console.error('AI Error:', error);
-        showWarning('Failed to generate subtasks. Check your API key and console.');
+        // Network errors (CORS, offline, etc.)
+        if (error.name === 'TypeError' && error.message.includes('fetch')) {
+            showWarning('🌐 Network error — check your internet connection or the API endpoint URL.', 'error');
+        } else {
+            showWarning(`Failed to generate subtasks (${API_PROVIDERS[currentProvider].name}). See console for details.`, 'error');
+        }
     } finally {
         button.classList.remove('loading');
         button.disabled = false;
@@ -577,12 +862,42 @@ function setupEventListeners() {
     elements.pauseTimer.addEventListener('click', pauseTimer);
     elements.resetTimer.addEventListener('click', resetTimer);
     
-    // API Key
-    elements.saveApiKey.addEventListener('click', saveApiKey);
+    // Timer presets
+    elements.presetBtns.forEach(btn => {
+        btn.addEventListener('click', () => {
+            const minutes = parseInt(btn.dataset.minutes, 10);
+            setTimerDuration(minutes);
+        });
+    });
+    
+    // Custom timer input
+    elements.setCustomTime.addEventListener('click', () => {
+        const minutes = parseInt(elements.customMinutes.value, 10);
+        if (minutes && minutes >= 1 && minutes <= 180) {
+            setTimerDuration(minutes);
+            elements.customMinutes.value = '';
+        } else {
+            showWarning('Please enter a valid duration (1-180 minutes)');
+        }
+    });
+    elements.customMinutes.addEventListener('keypress', (e) => {
+        if (e.key === 'Enter') elements.setCustomTime.click();
+    });
+    
+    // API Configuration
+    elements.saveApiKey.addEventListener('click', saveApiConfig);
     elements.apiKeyInput.addEventListener('focus', function() {
         if (this.dataset.hasKey === 'true') {
             this.value = '';
             this.dataset.hasKey = 'false';
+        }
+    });
+    elements.apiProvider.addEventListener('change', () => {
+        currentProvider = elements.apiProvider.value;
+        updateProviderUI();
+        // Set default model for new provider if model field is empty
+        if (!elements.modelNameInput.value.trim()) {
+            elements.modelNameInput.value = API_PROVIDERS[currentProvider].defaultModel;
         }
     });
     
