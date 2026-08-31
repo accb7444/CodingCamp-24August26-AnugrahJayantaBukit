@@ -35,6 +35,17 @@
                 <section class="widget timer-widget">
                     <h3 class="widget-title">Focus Timer (Pomodoro)</h3>
                     <div class="timer-display" id="timerDisplay">25:00</div>
+                    <div class="timer-presets">
+                        <button class="preset-btn" data-minutes="5">5m</button>
+                        <button class="preset-btn" data-minutes="15">15m</button>
+                        <button class="preset-btn active" data-minutes="25">25m</button>
+                        <button class="preset-btn" data-minutes="45">45m</button>
+                        <button class="preset-btn" data-minutes="60">60m</button>
+                        <div class="custom-time-input">
+                            <input type="number" id="customMinutes" min="1" max="180" placeholder="Min" class="time-input">
+                            <button class="preset-btn set-btn" id="setCustomTime">Set</button>
+                        </div>
+                    </div>
                     <div class="timer-controls">
                         <button class="btn btn-primary" id="startTimer">Start</button>
                         <button class="btn btn-secondary" id="pauseTimer">Pause</button>
@@ -56,13 +67,38 @@
                     
                     <!-- API Key Configuration -->
                     <div class="api-config">
-                        <input 
-                            type="password" 
-                            class="api-key-input" 
-                            id="apiKeyInput" 
-                            placeholder="Enter Google Gemini API Key (optional for AI features)"
-                        >
-                        <button class="btn-small" id="saveApiKey">Save Key</button>
+                        <div class="api-config-row">
+                            <select class="api-provider-select" id="apiProvider">
+                                <option value="gemini">Google Gemini</option>
+                                <option value="openrouter">OpenRouter</option>
+                                <option value="custom">Custom (OpenAI-compatible)</option>
+                            </select>
+                        </div>
+                        <div class="api-config-row" id="modelNameRow">
+                            <input 
+                                type="text" 
+                                class="api-key-input" 
+                                id="modelNameInput" 
+                                placeholder="Model name (e.g. google/gemini-pro, openai/gpt-4o)"
+                            >
+                        </div>
+                        <div class="api-config-row" id="customEndpointRow" style="display:none;">
+                            <input 
+                                type="text" 
+                                class="api-key-input" 
+                                id="customEndpointInput" 
+                                placeholder="Custom API endpoint URL"
+                            >
+                        </div>
+                        <div class="api-config-row">
+                            <input 
+                                type="password" 
+                                class="api-key-input" 
+                                id="apiKeyInput" 
+                                placeholder="Enter API Key (optional for AI features)"
+                            >
+                            <button class="btn-small" id="saveApiKey">Save</button>
+                        </div>
                     </div>
                     
                     <div class="todo-input-container">
