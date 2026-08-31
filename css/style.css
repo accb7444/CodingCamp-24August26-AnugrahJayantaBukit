@@ -189,6 +189,75 @@ body {
     justify-content: center;
 }
 
+.timer-presets {
+    display: flex;
+    gap: 0.5rem;
+    justify-content: center;
+    align-items: center;
+    flex-wrap: wrap;
+    margin-bottom: 1.5rem;
+}
+
+.preset-btn {
+    padding: 0.4rem 0.9rem;
+    border: 1px solid var(--border-color);
+    border-radius: 20px;
+    background-color: var(--bg-tertiary);
+    color: var(--text-secondary);
+    font-size: 0.85rem;
+    font-weight: 500;
+    cursor: pointer;
+    transition: all 0.3s ease;
+}
+
+.preset-btn:hover {
+    background-color: var(--bg-hover);
+    color: var(--text-primary);
+    border-color: var(--accent-primary);
+}
+
+.preset-btn.active {
+    background-color: var(--accent-primary);
+    color: white;
+    border-color: var(--accent-primary);
+    box-shadow: 0 0 12px var(--accent-glow);
+}
+
+.custom-time-input {
+    display: flex;
+    gap: 0.25rem;
+    align-items: center;
+}
+
+.time-input {
+    width: 60px;
+    padding: 0.4rem 0.5rem;
+    border: 1px solid var(--border-color);
+    border-radius: 20px;
+    background-color: var(--bg-tertiary);
+    color: var(--text-primary);
+    font-size: 0.85rem;
+    text-align: center;
+    -moz-appearance: textfield;
+}
+
+.time-input::-webkit-outer-spin-button,
+.time-input::-webkit-inner-spin-button {
+    -webkit-appearance: none;
+    margin: 0;
+}
+
+.time-input:focus {
+    outline: none;
+    border-color: var(--accent-primary);
+    box-shadow: 0 0 8px var(--accent-glow);
+}
+
+.set-btn {
+    font-size: 0.75rem !important;
+    padding: 0.4rem 0.6rem !important;
+}
+
 /* ===========================
    BUTTONS
    =========================== */
@@ -263,12 +332,35 @@ body {
 
 .api-config {
     display: flex;
+    flex-direction: column;
     gap: 0.5rem;
     margin-bottom: 1rem;
     padding: 1rem;
     background-color: var(--bg-tertiary);
     border-radius: 8px;
     border: 1px solid var(--border-color);
+}
+
+.api-config-row {
+    display: flex;
+    gap: 0.5rem;
+    align-items: center;
+}
+
+.api-provider-select {
+    width: 100%;
+    padding: 0.5rem;
+    background-color: var(--bg-primary);
+    color: var(--text-primary);
+    border: 1px solid var(--border-color);
+    border-radius: 4px;
+    font-size: 0.9rem;
+    cursor: pointer;
+}
+
+.api-provider-select:focus {
+    outline: none;
+    border-color: var(--accent-primary);
 }
 
 .api-key-input {
